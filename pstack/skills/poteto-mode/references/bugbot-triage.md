@@ -1,10 +1,10 @@
-# Bugbot triage
+# Automated-review triage (Bugbot, Devin Review, or any PR reviewer bot)
 
-Use this reference when the Babysit playbook (`../playbooks/babysit.md`) handles Bugbot or review-automation comments. The goal is not to ignore Bugbot by default. The goal is to stop treating every comment as a required code change.
+Use this reference when the Babysit playbook (`../playbooks/babysit.md`) handles comments from Bugbot, Devin Review, or any automated PR reviewer. The goal is not to ignore the reviewer by default. The goal is to stop treating every comment as a required code change.
 
 ## Decision rubric
 
-Classify each Bugbot thread before acting:
+Classify each reviewer thread before acting:
 
 - `fix`: The comment identifies a plausible correctness, security, privacy, data loss, auth, billing, migration, idempotency, race, or shipped-behavior issue. Fix it in the lowest owning PR, then reply with the commit SHA and resolve the thread.
 - `dismiss`: The comment matches a documented low-risk noisy pattern, and the current code/context proves the concern does not need a code change. Reply with a short reason and resolve the thread.

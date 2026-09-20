@@ -1,7 +1,8 @@
 ---
 name: arena
-description: "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
-disable-model-invocation: true
+description: "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /pstack:arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
+triggers:
+  - user
 ---
 
 # Arena
@@ -25,12 +26,12 @@ The N candidates will receive the same prompt, so the prompt is the contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. The rubric is the picker's tool in Phase D. Candidates only see the task.
-3. Pick the runners. Use `arena runners` from `~/.cursor/rules/pstack-models.mdc` when present. Otherwise default to one each on `claude-fable-5-1-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
-4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
+3. Pick the runners. Use the panel seats, `pstack:pstack-panel-a` through `pstack:pstack-panel-d`, one runner per seat. `~/.devin/rules/pstack-models.md` (written by `/pstack:setup-pstack`) pins each seat to a distinct model, which is where the diversity comes from; until it exists the seats run on Devin's default subagent model. Spawn more when the arena covers multiple design directions; add `subagent_general` runners beyond the four seats. The same profile N times is fine when the work is generation-bound rather than judgment-sensitive.
+4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the [Separate Before Serializing Shared State](../poteto-mode/references/principles/separate-before-serializing-shared-state.md) principle.
 
 ## Phase B: Fan out
 
-Spawn all N subagents in one message with `run_in_background: true`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.
+Spawn all N subagents in one message, running in the background (background subagents inherit granted permissions and cannot prompt), each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.
 
 Each rationale names the alternatives the candidate considered and what it rejected.
 
@@ -38,7 +39,7 @@ If a candidate fails to produce output, proceed with N-1 and note the dropout in
 
 ## Phase C: Cross-judge
 
-After all Phase B candidates complete, choose one model from the `arena cross-judge pool` in `~/.cursor/rules/pstack-models.mdc` when present. Otherwise use `claude-fable-5-1-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`. Prefer a different model family from the parent's. Spawn one readonly judge subagent on that model. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Don't spawn the judge while candidates are still writing.
+After all Phase B candidates complete, choose one seat from the panel (`pstack:pstack-panel-a` through `pstack:pstack-panel-d`), preferring one whose pinned model differs from the parent's when `~/.devin/rules/pstack-models.md` exists. Spawn one judge subagent on that seat profile. It only reads: it sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale; instruct it not to write. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Don't spawn the judge while candidates are still writing.
 
 ## Phase D: Pick a base
 
@@ -54,7 +55,7 @@ Record the pick and the reason in a short synthesis note alongside the base arti
 
 Walk each losing candidate once more and identify what is worth porting into the base. The signal is usually one or two things per candidate, not most of it.
 
-Fold each graft in by hand, per the **redesign-from-first-principles** principle skill. Don't paste mechanically. The result has to remain coherent under one mental model.
+Fold each graft in by hand, per the [Redesign from First Principles](../poteto-mode/references/principles/redesign-from-first-principles.md) principle. Don't paste mechanically. The result has to remain coherent under one mental model.
 
 Record what was grafted, from which candidate, and what was rejected and why.
 
@@ -62,7 +63,7 @@ When N candidates converge on the same shape, that is a strong agreement signal.
 
 ## Phase F: Verify
 
-The synthesized artifact has to hold up under the same scrutiny as any other output, per the **prove-it-works** principle skill.
+The synthesized artifact has to hold up under the same scrutiny as any other output, per the [Prove It Works](../poteto-mode/references/principles/prove-it-works.md) principle.
 
 If verification surfaces a problem the arena did not catch, either Phase A was wrong (re-frame and re-run) or one candidate caught it and you missed the graft (go back to Phase E). Don't paper over.
 

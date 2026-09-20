@@ -1,7 +1,8 @@
 ---
 name: reflect
 description: Spawn three parallel review subagents over the active transcript, surface learnings, and route each to a concrete edit on an existing skill. Use when the user says reflect.
-disable-model-invocation: true
+triggers:
+  - user
 ---
 
 # Reflect
@@ -10,41 +11,39 @@ Mine the current conversation for durable learnings, then route them into skill 
 
 ## When to invoke
 
-Invoke when the user says "reflect" or "/reflect". Skip when the conversation is trivial, off-topic, or already covered by an existing skill the parent followed correctly. One-offs are not learnings.
+Invoke when the user says "reflect" or "/pstack:reflect". Skip when the conversation is trivial, off-topic, or already covered by an existing skill the parent followed correctly. One-offs are not learnings.
 
 ## Process
 
 ### 1. Locate the active transcript
 
-The parent finds its own transcript file before fanning out. The system prompt names the active workspace's `agent-transcripts/` directory. Use that path. Do not glob across `~/.cursor/projects/*/`. That crosses workspace boundaries and reads private chats from unrelated projects.
+The parent finds its own transcript before fanning out. Devin sessions live in a sqlite DB: `%APPDATA%\devin\cli\sessions.db` on Windows, `~/.config/devin/cli/sessions.db` on Linux/macOS. `sessions(id, working_directory, title, model, created_at, last_activity_at, ...)` lists them and `message_nodes(session_id, node_id, parent_node_id, chat_message /*JSON*/, created_at)` holds the messages. `devin -r` or `/ls` lists sessions too. Filter `sessions.working_directory` to the current workspace. Never read another workspace's rows; that crosses workspace boundaries and reads private chats from unrelated projects.
 
 ```bash
-ls -t <agent-transcripts>/*.jsonl <agent-transcripts>/*/*.jsonl <agent-transcripts>/*/subagents/*.jsonl 2>/dev/null | head -10
+python -c "import sqlite3; db = sqlite3.connect(r'%APPDATA%\devin\cli\sessions.db'); [print(r) for r in db.execute('select id, title, last_activity_at from sessions where working_directory = ? order by last_activity_at desc limit 10', [r'<cwd>'])]"
 ```
 
-Three transcript layouts: legacy flat (`<id>.jsonl`), current nested (`<id>/<id>.jsonl`), and subagent (`<parent>/subagents/<child>.jsonl`).
-
-For each candidate, read the first JSONL line and check that `message.content[0].text` contains the conversation's opening user prompt. Take the matching path. If no path resolves, write a tight digest of the session and pass that instead.
+For each candidate session, read its earliest `message_nodes.chat_message` values and check one contains the conversation's opening user prompt. Take the matching `session_id`. If no session resolves, write a tight digest of the session and pass that instead.
 
 ### 2. Spawn three reviewers in parallel
 
-One message, three `Task` calls, `subagent_type: generalPurpose`, explicit `model:` on each, agent mode (`readonly: false`). Reviewers need MCP access for context lookups (tickets, chat threads, observability traces referenced in the transcript). Readonly strips MCPs.
+One message, three `run_subagent` calls (the sidekick tool when running under Fusion). Reviewers need MCP access for context lookups (tickets, chat threads, observability traces referenced in the transcript), so use write-capable profiles and instruct them to report only; read-only explore subagents cannot use MCP tools.
 
-| Lens | `model` | Prompt template |
+| Lens | Profile | Prompt template |
 |---|---|---|
-| Judgment | your configured reflect-judgment model (default `claude-fable-5-1-thinking-max`) | `references/judgment-reviewer.md` |
-| Tooling | your configured reflect-tooling model (default `gpt-5.6-sol-max`) | `references/tooling-reviewer.md` |
-| Divergent | your configured reflect-judgment model (default `claude-fable-5-1-thinking-max`) | `references/divergent-reviewer.md` |
+| Judgment | `pstack:pstack-judge` | `references/judgment-reviewer.md` |
+| Tooling | `pstack:pstack-panel-b` | `references/tooling-reviewer.md` |
+| Divergent | `pstack:pstack-panel-c` | `references/divergent-reviewer.md` |
 
-Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `Task` response body.
+Pass each template verbatim, substituting the session id or digest where marked. Reviewers return findings in the subagent response body.
 
 ### 3. Synthesize
 
-One `Task` call, `subagent_type: generalPurpose`, using your configured reflect-judgment model (default `claude-fable-5-1-thinking-max`), agent mode (`readonly: false`). The synthesizer's quality check includes spot-verifying citations, which can require MCP access. Readonly strips MCPs. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
+One `run_subagent` call on `pstack:pstack-judge`. The synthesizer's quality check includes spot-verifying citations, which can require MCP access, so do not use a read-only profile. If `pstack:pstack-judge` is missing, fall back to `subagent_general` and note it in the reply. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
 ### 4. Structural enforcement check
 
-Sanity-check the synthesizer's Accepted list. For any item that would be enforced more reliably by a lint rule, script, metadata flag, or runtime check, move it from Accepted to Backlog. See the **encode-lessons-in-structure** principle skill.
+Sanity-check the synthesizer's Accepted list. For any item that would be enforced more reliably by a lint rule, script, metadata flag, or runtime check, move it from Accepted to Backlog. See the [Encode Lessons in Structure](../poteto-mode/references/principles/encode-lessons-in-structure.md) principle.
 
 ### 5. Apply
 
@@ -55,9 +54,9 @@ Backlog items file to whatever devex / backlog tracker your team uses automatica
 For each approved Accepted item, follow the Routing field exactly:
 
 - Trivial existing-skill edit (a one-line bullet, a tightened sentence, a stale fact corrected): parent does directly.
-- Substantive existing-skill edit (a new section, a new pattern table, more than ~10 lines): hand to Cursor's built-in `create-skill` skill and run its draft / test / iterate loop.
-- `tune description: <skill path>` (the skill exists but didn't trigger when it should have): hand to `create-skill` and run its description-optimization loop.
-- `new skill via create-skill: <kebab-name>`: hand creation to `create-skill`. Do not invent the shape ad hoc.
+- Substantive existing-skill edit (a new section, a new pattern table, more than ~10 lines): follow Devin's SKILL.md conventions in the authoring-a-skill playbook (`../pstack:poteto-mode/playbooks/authoring-a-skill.md`) and run its draft / test / iterate loop.
+- `tune description: <skill path>` (the skill exists but didn't trigger when it should have): run the authoring-a-skill playbook's description-optimization loop.
+- `new skill: <kebab-name>`: create it per the authoring-a-skill playbook (`../pstack:poteto-mode/playbooks/authoring-a-skill.md`). Do not invent the shape ad hoc.
 
 If your environment ships a SKILL.md validator, run it on every touched skill before declaring done. Skip this step if it doesn't.
 

@@ -1,7 +1,8 @@
 ---
 name: triage-issue-reports
 description: Triage Slack issue reports with one thread-only verdict, evidence review, cause-aware routing, tracker dedupe, and fail-closed ticket creation. Use only from the configured Benny triage automation.
-disable-model-invocation: true
+triggers:
+  - user
 ---
 
 # Triage issue reports
@@ -24,8 +25,8 @@ Load the external Benny configuration supplied by the automation. If the config 
 - If worker isolation cannot enforce those limits, do the work in the coordinator.
 - Never create an issue that cannot link back to the source thread.
 - Prefer no ticket over a guessed or duplicate ticket.
-- Apply pstack's `principle-separate-before-serializing-shared-state` to source coordinates.
-- Apply pstack's `principle-minimize-reader-load` and `unslop` skills to the final verdict.
+- Apply the `separate-before-serializing-shared-state` principle (pstack `skills/poteto-mode/references/principles/separate-before-serializing-shared-state.md`) to source coordinates.
+- Apply the `minimize-reader-load` principle (pstack `skills/poteto-mode/references/principles/minimize-reader-load.md`) and pstack's `unslop` skill (`/pstack:unslop`) to the final verdict.
 
 ## 1. Freeze source coordinates
 
@@ -68,7 +69,7 @@ Use evidence already in the thread before asking the reporter for more.
 
 ## 3. Trace cause before routing
 
-Do a bounded source and history pass before choosing an owner or destination. Use pstack's `how` skill to trace the path from the reported action to the observed result. Use `why` when the report looks like a regression or touches defensive code.
+Do a bounded source and history pass before choosing an owner or destination. Use pstack's `how` skill (`/pstack:how`) to trace the path from the reported action to the observed result. Use `why` (`/pstack:why`) when the report looks like a regression or touches defensive code.
 
 1. Identify the likely code path from the reported action to the observed result.
 2. Check whether the visible symptom belongs to that code path or a dependency below it.

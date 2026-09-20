@@ -5,8 +5,11 @@ Internal-style workflows for CI, code review, shipping, and test reliability. Th
 ## Installation
 
 ```bash
-/add-plugin cursor-team-kit
+devin auth login
+devin plugins install --local ~/.devin-plugins/cursor-team-kit
 ```
+
+Skills are then invoked as `/cursor-team-kit:<skill>` (e.g. `/cursor-team-kit:deslop`).
 
 ## Components
 
@@ -30,15 +33,17 @@ Internal-style workflows for CI, code review, shipping, and test reliability. Th
 | `weekly-review` | Generate a weekly recap of shipped work with bugfix/tech-debt/net-new highlights |
 | `fix-merge-conflicts` | Resolve merge conflicts, validate build/tests, and summarize decisions |
 | `deslop` | Remove AI-generated code slop and clean up code style |
-| `workflow-from-chats` | Extract durable working preferences from chats into skills, rules, or docs |
+| `workflow-from-chats` | Extract durable working preferences from sessions into skills, rules, or docs |
 | `thermo-nuclear-code-quality-review` | Run an unusually strict maintainability review (code-judo, 1k-line rule, spaghetti, boundaries) |
 
 ### Agents
 
+Custom subagent profiles, spawned with `run_subagent` as `cursor-team-kit:<name>`.
+
 | Agent | Description |
 |:------|:------------|
 | `ci-watcher` | Monitor GitHub Actions runs and return concise pass/fail summaries |
-| `thermo-nuclear-code-quality-review` | Task subagent that runs the thermo-nuclear code quality rubric against a diff |
+| `thermo-nuclear-code-quality-review` | Subagent profile that runs the thermo-nuclear code quality rubric against a diff |
 
 ### Rules
 
@@ -50,3 +55,15 @@ Internal-style workflows for CI, code review, shipping, and test reliability. Th
 ## License
 
 MIT
+
+## Adapted for Devin
+
+This plugin was adapted from [`cursor/plugins`](https://github.com/cursor/plugins) @ `6ed0f7a9504f577d7529064103cecce9be7dfc5e` (2026-09-20). The mapping:
+
+- `Task` tool calls → `run_subagent` with profiles (`subagent_general`, `subagent_explore`, `cursor-team-kit:ci-watcher`, `cursor-team-kit:thermo-nuclear-code-quality-review`).
+- per-call `model:` → `model:` pinned on agent profiles; Cursor effort tokens have no Devin equivalent.
+- `AskQuestion` → `ask_user_question`; `Read` → `read`.
+- `.mdc` rules → `rules/*.md` with `trigger:` frontmatter (`always_on`).
+- chat transcripts → the Devin session store (`sessions.db`, filtered by `working_directory`).
+
+To update from upstream: re-vendor the upstream plugin directory over this repo, then `git diff` against the baseline vendoring commit to re-apply this adaptation.

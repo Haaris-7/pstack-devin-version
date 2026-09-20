@@ -18,7 +18,7 @@ Examples of the pattern:
 - User describes a flaky test the agent could have queried via an observability MCP. Routing: the debugging skill should mention the observability MCP.
 - User links a chat thread the agent could have fetched via a chat MCP. Routing: the relevant skill should mention the chat MCP.
 
-Read the active transcript at <ABSOLUTE_PATH> (or use the digest below if no path is given).
+Read the active session from the Devin session store, meaning the `message_nodes` rows for session id <SESSION_ID> in `sessions.db` (`%APPDATA%\devin\cli\sessions.db` on Windows, `~/.config/devin/cli/sessions.db` on Linux/macOS), or use the digest below if no session is given.
 
 Scan for:
 - Tool invocations and command flags the agent had to discover
@@ -32,8 +32,8 @@ Scan for:
 
 Findings must point to skills, tools, or MCPs invoked in this transcript. Speculative routings to skills the parent never opened do not count. To check whether a skill was used, scan the transcript for:
 
-- `Read` tool calls against any `SKILL.md` file (workspace `.cursor/skills/`, user-level `~/.cursor/skills/`, or plugin-installed paths under `~/.cursor/plugins/`)
-- `Task` prompts that name a skill path
+- `read` tool calls against any `SKILL.md` file (workspace `.devin/skills/`, user-level `~/.config/devin/skills/` or `%APPDATA%\devin\skills\`, or installed plugin paths shown by `devin plugins info <name>`)
+- `run_subagent` prompts that name a skill path
 - Tool calls (Shell, Grep, MCP, etc.) that match a skill's documented commands
 
 Two valid finding shapes:
